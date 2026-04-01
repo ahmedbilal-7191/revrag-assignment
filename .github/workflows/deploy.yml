@@ -1,0 +1,65 @@
+name: Secure Build and Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: myuser/myapp
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+
+      # Checkout (pinned action version)
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 #v4.2
+
+      # Docker login using GitHub secrets
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | \
+          docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      # Build image with immutable tag
+      - name: Build Docker image
+        run: |
+          docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+      # Vulnerability Scan (Trivy)
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          format: table
+          severity: CRITICAL
+          exit-code: 1
+          output: trivy-report.txt
+
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4 #could use a pinned version here as well
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+
+      # Push image only if scan passes
+      - name: Push Docker image
+        run: docker push $IMAGE_NAME:$IMAGE_TAG
+
+      # Configure SSH known_hosts
+      - name: Configure SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy to production
+        run: |
+          ssh deploy@${{ secrets.SERVER_IP }} \
+          "docker pull $IMAGE_NAME:$IMAGE_TAG && \
+           docker run -d \
+           -p 80:3000 \
+           --read-only \
+           --cap-drop ALL \
+           $IMAGE_NAME:$IMAGE_TAG"

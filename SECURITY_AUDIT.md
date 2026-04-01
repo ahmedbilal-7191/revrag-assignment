@@ -8,7 +8,7 @@ This document explains all security and quality issues identified in the provide
 # Task 1 — Dockerfile Audit
 
 ## 1. Using `node:latest`
-**Problem:** The problem with latest is that it's a moving target. Today it might point to Node 20, tomorrow it could pull Node 22 with breaking changes or new vulnerabilities without you even knowing. It also makes rollbacks harder because you can't be sure what exact image was used in a previous deployment. 
+**Problem:** The problem with latest is that it's a moving target. Today it might point to Node 20, tomorrow it could pull Node 22 with breaking changes or new vulnerabilities without you even knowing. It also makes rollbacks harder because you can't be sure what exact image was used in a previous deployment.  
 **Fix:** I fixed this by pinning to a specific version like node:20.19.0-alpine3.21 so every build is predictable and traceable.
 
 ---
